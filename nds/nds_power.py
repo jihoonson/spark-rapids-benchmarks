@@ -167,6 +167,7 @@ def run_one_query(spark_session,
                   profiler,
                   query,
                   query_name,
+                  plan_path,
                   output_path,
                   output_format):
     with profiler(query_name=query_name):
@@ -177,6 +178,9 @@ def run_one_query(spark_session,
         else:
             ensure_valid_column_names(df).write.format(output_format).mode('overwrite').save(
                     output_path + '/' + query_name)
+        if plan_path:
+            with open(plan_path, 'w') as f:
+                f.write(df.explain(extended=True))
 
 def ensure_valid_column_names(df: DataFrame):
     def is_column_start(char):
@@ -233,6 +237,7 @@ def run_query_stream(input_prefix,
                      sub_queries,
                      input_format="parquet",
                      use_decimal=True,
+                     plan_path=None,
                      output_path=None,
                      output_format="parquet",
                      json_summary_folder=None,
@@ -310,6 +315,7 @@ def run_query_stream(input_prefix,
                                                    profiler,
                                                    q_content,
                                                    query_name,
+                                                   plan_path,
                                                    output_path,
                                                    output_format)
         print(f"Time taken: {summary['queryTimes']} millis for {query_name}")
@@ -400,6 +406,8 @@ if __name__ == "__main__":
                         'for more details.',
                         choices=['parquet', 'orc', 'avro', 'csv', 'json', 'iceberg', 'delta'],
                         default='parquet')
+    parser.add_argument('--plan_prefix',
+                        help='path to export spark plans (e.g., "file:///ds-parquet")')
     parser.add_argument('--output_prefix',
                         help='text to prepend to every output file (e.g., "hdfs:///ds-parquet")')
     parser.add_argument('--output_format',
@@ -455,6 +463,7 @@ if __name__ == "__main__":
                      args.sub_queries,
                      args.input_format,
                      not args.floats,
+                     args.plan_prefix,
                      args.output_prefix,
                      args.output_format,
                      args.json_summary_folder,
