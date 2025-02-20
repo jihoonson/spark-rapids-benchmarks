@@ -179,7 +179,8 @@ def run_one_query(spark_session,
             ensure_valid_column_names(df).write.format(output_format).mode('overwrite').save(
                     output_path + '/' + query_name)
         if plan_path:
-            spark_session.read.json(df.queryExecution.optimizedPlan.toJSON).write.format("json").mode("overwrite").save(plan_path + '/' + query_name)
+            # spark_session.read.json(df.queryExecution.optimizedPlan.toJSON).write.format("json").mode("overwrite").save(plan_path + '/' + query_name)
+            df.queryExecution.optimizedPlan.write.json(plan_path + '/' + query_name)
 
 def ensure_valid_column_names(df: DataFrame):
     def is_column_start(char):
