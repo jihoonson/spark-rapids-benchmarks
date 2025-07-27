@@ -75,6 +75,7 @@ def store(session,
           compression,
           prefix="",
           delta_unmanaged=False,
+          delta_optimize_write=False,
           hive_external=False):
     """Create Iceberg tables by CTAS
 
@@ -137,19 +138,17 @@ def store(session,
                 writer = writer.option('compression', compression)
             writer = writer.format(output_format).mode(
                 output_mode).partitionBy(TABLE_PARTITIONING[filename])
-            if not hive_external:
-                writer.save(data_path)
-            else:
-                writer.saveAsTable(filename, path=data_path)
         else:
             writer = df.coalesce(1).write
             if compression:
                 writer = writer.option('compression', compression)
             writer = writer.format(output_format).mode(output_mode)
-            if not hive_external:
-                writer.save(data_path)
-            else:
-                writer.saveAsTable(filename, path=data_path)
+        if output_format == "delta" and delta_optimize_write:
+            writer = writer.option("optimizeWrite", "True")
+        if not hive_external:
+            writer.save(data_path)
+        else:
+            writer.saveAsTable(filename, path=data_path)
 
 def transcode(args):
     session_builder = pyspark.sql.SparkSession.builder
@@ -199,6 +198,7 @@ def transcode(args):
                           args.compression,
                           args.output_prefix,
                           args.delta_unmanaged,
+                          args.delta_optimize_write,
                           args.hive),
             number=1)
 
@@ -301,6 +301,12 @@ if __name__ == "__main__":
         action='store_true',
         help='Use unmanaged tables for DeltaLake. This is useful for testing DeltaLake without ' +
         'leveraging a Metastore service.')
+    parser.add_argument(
+        '--delta_optimize_write',
+        action='store_true',
+        default=False,
+        help='Enable Delta Lake optimize write feature.'
+    )
     parser.add_argument(
         '--hive',
         action='store_true',

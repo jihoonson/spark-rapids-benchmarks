@@ -21,13 +21,15 @@
 source base.template
 export SHUFFLE_PARTITIONS=${SHUFFLE_PARTITIONS:-200}
 
-export SPARK_CONF=("--master" "${SPARK_MASTER}"
+export SPARK_CONF=("--master" "local[*]"
                    "--deploy-mode" "client"
-                   "--conf" "spark.driver.memory=${DRIVER_MEMORY}"
-                   "--conf" "spark.executor.cores=${EXECUTOR_CORES}"
-                   "--conf" "spark.executor.instances=${NUM_EXECUTORS}"
-                   "--conf" "spark.executor.memory=${EXECUTOR_MEMORY}"
+                   "--conf" "spark.driver.memory=16g"
+                   "--conf" "spark.executor.instances=1"
+                   "--conf" "spark.executor.memory=16g"
                    "--conf" "spark.sql.shuffle.partitions=${SHUFFLE_PARTITIONS}"
-                   "--packages" "io.delta:delta-core_2.12:1.1.0"
+                   "--conf" "spark.eventLog.enabled=true"
+                   "--conf" "spark.eventLog.dir=/tmp/spark-events"
+                   "--packages" "io.delta:delta-spark_2.12:3.3.1"
+                   "--conf" "spark.sql.legacy.charVarcharAsString=true"
                    "--conf" "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension"
                    "--conf" "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog")

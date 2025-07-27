@@ -1,0 +1,54 @@
+#
+# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# 1. The io.delta:delta-core_2.12:1.1.0 only works on Spark 3.2.x
+#    Please refer to https://docs.delta.io/latest/releases.html for other Spark versions.
+
+source base.template
+export SHUFFLE_PARTITIONS=${SHUFFLE_PARTITIONS:-200}
+export SPARK_RAPIDS_PLUGIN_JAR=~/Local/opt/rapids-4-spark_2.12-25.08.0-SNAPSHOT-cuda12-spark355.jar
+
+export SPARK_CONF=("--master" "local[16]"
+                   "--deploy-mode" "client"
+		   "--driver-memory" "50g"
+		   "--executor-memory" "4g"
+                   "--conf" "spark.sql.shuffle.partitions=${SHUFFLE_PARTITIONS}"
+                   "--conf" "spark.eventLog.enabled=true"
+                   "--conf" "spark.eventLog.dir=/tmp/spark-events"
+                   "--packages" "io.delta:delta-spark_2.12:3.3.1"
+                   "--conf" "spark.sql.legacy.charVarcharAsString=true"
+                   "--conf" "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension"
+                   "--conf" "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
+                   "--conf" "spark.executor.resource.gpu.amount=1"
+                   "--conf" "spark.plugins=com.nvidia.spark.SQLPlugin"
+                   "--conf" "spark.rapids.memory.pinnedPool.size=8g"
+                   "--conf" "spark.rapids.sql.concurrentGpuTasks=2"
+                   "--conf" "spark.rapids.sql.explain=NONE"
+                   "--conf" "spark.rapids.sql.incompatibleOps.enabled=true"
+                   "--conf" "spark.rapids.sql.variableFloatAgg.enabled=true"
+                   "--conf" "spark.driver.extraJavaOptions=-Dai.rapids.cudf.nvtx.enabled=true -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"
+                   "--conf" "spark.executor.extraJavaOptions=-Dai.rapids.cudf.nvtx.enabled=true"
+                   "--conf" "spark.sql.files.maxPartitionBytes=2g"
+                   "--jars" "$SPARK_RAPIDS_PLUGIN_JAR"
+		   "--conf" "spark.shuffle.manager=com.nvidia.spark.rapids.spark355.RapidsShuffleManager"
+                   "--conf" "spark.rapids.shuffle.multiThreaded.writer.threads=16"
+                   "--conf" "spark.rapids.shuffle.multiThreaded.reader.threads=16"
+                   "--conf" "spark.rapids.shuffle.mode=MULTITHREADED")
+
+#                   "--conf" "spark.driver.extraJavaOptions=-Dai.rapids.cudf.nvtx.enabled=true"
+#                   "--conf" "spark.executor.extraJavaOptions=-Dai.rapids.cudf.nvtx.enabled=true"
+
