@@ -45,7 +45,7 @@ from pyspark.sql import DataFrame
 from check import check_json_summary_folder, check_query_subset_exists, check_version
 from nds_gen_query_stream import split_special_query
 from nds_schema import get_schemas
-from shared.power_run_common import ensure_valid_column_names, parse_explain_str, load_properties, register_delta_tables, Profiler
+from shared.power_run_common import ensure_valid_column_names, parse_explain_str, load_properties, register_delta_tables, Profiler, setup_tables
 
 check_version()
 
@@ -118,34 +118,7 @@ def gen_sql_from_stream(query_stream_file_path):
         extended_queries[q_name] = '-- start' + q_content
     return extended_queries
 
-def setup_tables(spark_session, input_prefix, input_format, use_decimal, execution_time_list):
-    """set up data tables in Spark before running the Power Run queries.
-
-    Args:
-        spark_session (SparkSession): a SparkSession instance to run queries.
-        input_prefix (str): path of input data.
-        input_format (str): type of input data source, e.g. parquet, orc, csv, json.
-        use_decimal (bool): use decimal type for certain columns when loading data of text type.
-        execution_time_list ([(str, str, int)]): a list to record query and its execution time.
-
-    Returns:
-        execution_time_list: a list recording query execution time.
-    """
-    spark_app_id = spark_session.sparkContext.applicationId
-    # Create TempView for tables
-    for table_name in get_schemas(False).keys():
-        start = int(time.time() * 1000)
-        table_path = input_prefix + '/' + table_name
-        reader =  spark_session.read.format(input_format)
-        if input_format in ['csv', 'json']:
-            reader = reader.schema(get_schemas(use_decimal)[table_name])
-        reader.load(table_path).createOrReplaceTempView(table_name)
-        end = int(time.time() * 1000)
-        print("====== Creating TempView for table {} ======".format(table_name))
-        print("Time taken: {} millis for table {}".format(end - start, table_name))
-        execution_time_list.append(
-            (spark_app_id, "CreateTempView {}".format(table_name), end - start))
-    return execution_time_list
+# setup_tables implementation moved to shared.power_run_common.setup_tables
 
 # register_delta_tables is provided by shared.power_run_common.register_delta_tables
 
@@ -260,7 +233,7 @@ def run_query_stream(input_prefix,
     spark_app_id = spark_session.sparkContext.applicationId
     if input_format != 'iceberg' and input_format != 'delta' and not hive_external:
         execution_time_list = setup_tables(spark_session, input_prefix, input_format, use_decimal,
-                                           execution_time_list)
+                                           execution_time_list, get_schemas)
 
     check_json_summary_folder(json_summary_folder)
     if sub_queries:

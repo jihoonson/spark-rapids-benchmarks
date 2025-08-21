@@ -79,6 +79,26 @@ def register_delta_tables(spark_session, input_prefix: str, execution_time_list:
     return execution_time_list
 
 
+def setup_tables(spark_session, input_prefix: str, input_format: str, use_decimal: bool, execution_time_list: List, get_schemas_fn: Callable):
+    """Top-level setup_tables kept compatible with `nds/nds_power.py` signature plus a required
+    `get_schemas_fn` that the caller must provide. This centralizes table creation logic.
+    """
+    spark_app_id = spark_session.sparkContext.applicationId
+    for table_name in get_schemas_fn(False).keys():
+        start = int(time.time() * 1000)
+        table_path = input_prefix + '/' + table_name
+        reader = spark_session.read.format(input_format)
+        if input_format in ['csv', 'json']:
+            reader = reader.schema(get_schemas_fn(use_decimal)[table_name])
+        reader.load(table_path).createOrReplaceTempView(table_name)
+        end = int(time.time() * 1000)
+        print("====== Creating TempView for table {} ======".format(table_name))
+        print("Time taken: {} millis for table {}".format(end - start, table_name))
+        execution_time_list.append(
+            (spark_app_id, "CreateTempView {}".format(table_name), end - start))
+    return execution_time_list
+
+
 class Profiler:
     def __init__(self, profiling_hook: Optional[str], output_root: Optional[str]):
         self.profiling_hook = profiling_hook
