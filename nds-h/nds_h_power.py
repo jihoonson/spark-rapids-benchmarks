@@ -52,6 +52,7 @@ from pyspark.sql import DataFrame
 
 from check import check_version, check_json_summary_folder, check_query_subset_exists
 from nds_h_schema import get_schemas
+from shared.power_run_common import ensure_valid_column_names, parse_explain_str, load_properties, Profiler
 
 check_version()
 
@@ -119,55 +120,7 @@ def setup_tables(spark_session, input_prefix, input_format, execution_time_list)
     return execution_time_list
 
 
-def ensure_valid_column_names(df: DataFrame):
-    def is_column_start(char):
-        return char.isalpha() or char == '_'
-
-    def is_column_part(char):
-        return char.isalpha() or char.isdigit() or char == '_'
-
-    def is_valid(column_name):
-        return len(column_name) > 0 and is_column_start(column_name[0]) and all(
-            [is_column_part(char) for char in column_name[1:]])
-
-    def make_valid(column_name):
-        # To simplify: replace all invalid char with '_'
-        valid_name = ''
-        if is_column_start(column_name[0]):
-            valid_name += column_name[0]
-        else:
-            valid_name += '_'
-        for char in column_name[1:]:
-            if not is_column_part(char):
-                valid_name += '_'
-            else:
-                valid_name += char
-        return valid_name
-
-    def deduplicate(column_names):
-        # In some queries like q35, it's possible to get columns with the same name. Append a number
-        # suffix to resolve this problem.
-        dedup_col_names = []
-        for i, v in enumerate(column_names):
-            count = column_names.count(v)
-            index = column_names[:i].count(v)
-            dedup_col_names.append(v + str(index) if count > 1 else v)
-        return dedup_col_names
-
-    valid_col_names = [c if is_valid(c) else make_valid(c) for c in df.columns]
-    dedup_col_names = deduplicate(valid_col_names)
-    return df.toDF(*dedup_col_names)
-
-
-def parse_explain_str(explain_str):
-    plan_strs = explain_str.split('\n\n')
-    plan_dict = {}
-    for plan_str in plan_strs:
-        if plan_str.startswith('== Optimized Logical Plan =='):
-            plan_dict['logical'] = plan_str
-        elif plan_str.startswith('== Physical Plan =='):
-            plan_dict['physical'] = plan_str
-    return plan_dict
+# ensure_valid_column_names, parse_explain_str, load_properties pulled from shared.power_run_common
 
 
 def run_one_query(spark_session,
@@ -330,13 +283,7 @@ def run_query_stream(input_prefix,
     sys.exit(exit_code)
 
 
-def load_properties(filename):
-    myvars = {}
-    with open(filename) as myfile:
-        for line in myfile:
-            name, var = line.partition("=")[::2]
-            myvars[name.strip()] = var.strip()
-    return myvars
+# load_properties provided by shared.power_run_common.load_properties
 
 
 if __name__ == "__main__":

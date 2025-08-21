@@ -45,6 +45,7 @@ from pyspark.sql import DataFrame
 from check import check_json_summary_folder, check_query_subset_exists, check_version
 from nds_gen_query_stream import split_special_query
 from nds_schema import get_schemas
+from shared.power_run_common import ensure_valid_column_names, parse_explain_str, load_properties, register_delta_tables, Profiler
 
 check_version()
 
@@ -146,32 +147,10 @@ def setup_tables(spark_session, input_prefix, input_format, use_decimal, executi
             (spark_app_id, "CreateTempView {}".format(table_name), end - start))
     return execution_time_list
 
-def register_delta_tables(spark_session, input_prefix, execution_time_list):
-    spark_app_id = spark_session.sparkContext.applicationId
-    # Register tables for Delta Lake
-    for table_name in get_schemas(False).keys():
-        start = int(time.time() * 1000)
-        # input_prefix must be absolute path: https://github.com/delta-io/delta/issues/555
-        register_sql = f"CREATE TABLE IF NOT EXISTS {table_name} USING DELTA LOCATION '{input_prefix}/{table_name}'"
-        print(register_sql)
-        spark_session.sql(register_sql)
-        end = int(time.time() * 1000)
-        print("====== Registering for table {} ======".format(table_name))
-        print("Time taken: {} millis for table {}".format(end - start, table_name))
-        execution_time_list.append(
-            (spark_app_id, "Register {}".format(table_name), end - start))
-    return execution_time_list
+# register_delta_tables is provided by shared.power_run_common.register_delta_tables
 
 
-def parse_explain_str(explain_str):
-    plan_strs = explain_str.split('\n\n')
-    plan_dict = {}
-    for plan_str in plan_strs:
-        if plan_str.startswith('== Optimized Logical Plan =='):
-            plan_dict['logical'] = plan_str
-        elif plan_str.startswith('== Physical Plan =='):
-            plan_dict['physical'] = plan_str
-    return plan_dict
+# parse_explain_str is provided by shared.power_run_common.parse_explain_str
 
 
 def run_one_query(spark_session,
@@ -201,44 +180,7 @@ def run_one_query(spark_session,
                     f.write(plans[plan_type])
 
 
-def ensure_valid_column_names(df: DataFrame):
-    def is_column_start(char):
-        return char.isalpha() or char == '_'
-
-    def is_column_part(char):
-        return char.isalpha() or char.isdigit() or char == '_'
-
-    def is_valid(column_name):
-        return len(column_name) > 0 and is_column_start(column_name[0]) and all(
-            [is_column_part(char) for char in column_name[1:]])
-
-    def make_valid(column_name):
-        # To simplify: replace all invalid char with '_'
-        valid_name = ''
-        if is_column_start(column_name[0]):
-            valid_name += column_name[0]
-        else:
-            valid_name += '_'
-        for char in column_name[1:]:
-            if not is_column_part(char):
-                valid_name += '_'
-            else:
-                valid_name += char
-        return valid_name
-
-    def deduplicate(column_names):
-        # In some queries like q35, it's possible to get columns with the same name. Append a number
-        # suffix to resolve this problem.
-        dedup_col_names = []
-        for i,v in enumerate(column_names):
-            count = column_names.count(v)
-            index = column_names[:i].count(v)
-            dedup_col_names.append(v+str(index) if count > 1 else v)
-        return dedup_col_names
-
-    valid_col_names = [c if is_valid(c) else make_valid(c) for c in df.columns]
-    dedup_col_names = deduplicate(valid_col_names)
-    return df.toDF(*dedup_col_names)
+# ensure_valid_column_names is provided by shared.power_run_common.ensure_valid_column_names
 
 def get_query_subset(query_dict, subset):
     """Get a subset of queries from query_dict.
@@ -405,13 +347,7 @@ def run_query_stream(input_prefix,
     if not allow_failure and exit_code:
         sys.exit(exit_code)
 
-def load_properties(filename):
-    myvars = {}
-    with open(filename) as myfile:
-        for line in myfile:
-            name, var = line.partition("=")[::2]
-            myvars[name.strip()] = var.strip()
-    return myvars
+# load_properties is provided by shared.power_run_common.load_properties
 
 if __name__ == "__main__":
     parser = parser = argparse.ArgumentParser()
