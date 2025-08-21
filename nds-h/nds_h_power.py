@@ -53,6 +53,7 @@ from pyspark.sql import DataFrame
 from check import check_version, check_json_summary_folder, check_query_subset_exists
 from nds_h_schema import get_schemas
 from shared.power_run_common import ensure_valid_column_names, parse_explain_str, load_properties, Profiler, setup_tables
+from shared.power_run_common import PowerRunner
 
 check_version()
 
@@ -183,14 +184,17 @@ def run_query_stream(input_prefix,
     check_json_summary_folder(json_summary_folder)
     if sub_queries:
         query_dict = get_query_subset(query_dict, sub_queries)
-
+    # create runner and profiler
+    runner = PowerRunner(PysparkBenchReport, get_schemas, app_name=app_name)
     power_start = int(time.time())
     for query_name, q_content in query_dict.items():
         # show query name in Spark web UI
         spark_session.sparkContext.setJobGroup(query_name, query_name)
         print("====== Run {} ======".format(query_name))
         q_report = PysparkBenchReport(spark_session, query_name)
-        summary = q_report.report_on(run_one_query,
+        # TPC-H has empty-output queries for query15 parts
+        empty_output = {'query15_part1', 'query15_part3'}
+        summary = q_report.report_on(lambda *args, **kwargs: runner.run_one_query(*args, empty_output_queries=empty_output, **kwargs),
                                      warmup_iterations,
                                      iterations,
                                      spark_session,
