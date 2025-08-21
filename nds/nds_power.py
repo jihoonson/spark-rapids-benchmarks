@@ -39,8 +39,8 @@ from pyspark.sql import SparkSession
 from PysparkBenchReport import PysparkBenchReport
 
 from check import check_json_summary_folder, check_version
-from shared.power_run_common import load_properties, get_query_subset
-from shared.power_run_common import Profiler, NDSPowerRunner
+from power_run_common import load_properties, get_query_subset
+from power_run_common import Profiler, NDSPowerRunner
 
 check_version()
 
@@ -196,8 +196,6 @@ def run_query_stream(input_prefix,
 
     if not allow_failure and exit_code:
         sys.exit(exit_code)
-
-# load_properties is provided by shared.power_run_common.load_properties
 
 if __name__ == "__main__":
     parser = parser = argparse.ArgumentParser()
