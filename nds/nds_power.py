@@ -46,6 +46,7 @@ from check import check_json_summary_folder, check_query_subset_exists, check_ve
 from nds_gen_query_stream import split_special_query
 from nds_schema import get_schemas
 from shared.power_run_common import ensure_valid_column_names, parse_explain_str, load_properties, register_delta_tables, Profiler, setup_tables
+from shared.power_run_common import PowerRunner
 
 check_version()
 
@@ -242,6 +243,9 @@ def run_query_stream(input_prefix,
     # Setup profiler
     profiler = Profiler(profiling_hook=profiling_hook, output_root=json_summary_folder)
 
+    # create a PowerRunner instance for shared run_one_query logic
+    runner = PowerRunner(PysparkBenchReport, get_schemas, app_name=app_name)
+
     # Run query
     power_start = int(time.time())
     for query_name, q_content in query_dict.items():
@@ -249,7 +253,8 @@ def run_query_stream(input_prefix,
         spark_session.sparkContext.setJobGroup(query_name, query_name)
         print("====== Run {} ======".format(query_name))
         q_report = PysparkBenchReport(spark_session, query_name)
-        summary = q_report.report_on(run_one_query,warmup_iterations,
+        # use shared runner.run_one_query to execute each query; leave profiler and behavior unchanged
+        summary = q_report.report_on(runner.run_one_query, warmup_iterations,
                                                    iterations,
                                                    spark_session,
                                                    profiler,
