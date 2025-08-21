@@ -47,7 +47,7 @@ sys.path.insert(0, utils_dir)
 from python_benchmark_reporter.PysparkBenchReport import PysparkBenchReport
 
 from check import check_version, check_json_summary_folder
-from power_run_common import load_properties, get_query_subset, NDSHPowerRunner, Profiler
+from utils.power_run_common import load_properties, get_query_subset, NDSHPowerRunner, Profiler
 
 check_version()
 

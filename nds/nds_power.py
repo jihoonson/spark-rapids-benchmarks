@@ -39,8 +39,15 @@ from pyspark.sql import SparkSession
 from PysparkBenchReport import PysparkBenchReport
 
 from check import check_json_summary_folder, check_version
-from power_run_common import load_properties, get_query_subset
-from power_run_common import Profiler, NDSPowerRunner
+
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), '..'))
+
+# Construct the path to the utils directory
+utils_dir = os.path.join(parent_dir, 'utils')
+# Add the utils directory to sys.path
+sys.path.insert(0, utils_dir)
+
+from power_run_common import load_properties, get_query_subset, Profiler, NDSPowerRunner
 
 check_version()
 
