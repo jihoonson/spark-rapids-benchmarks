@@ -267,6 +267,10 @@ def run_query_stream(input_prefix,
         for k, v in spark_properties.items():
             session_builder = session_builder.config(k, v)
     
+    if input_format == 'delta' and not delta_unmanaged:
+        session_builder.config("spark.sql.warehouse.dir", input_prefix)
+        session_builder.enableHiveSupport()
+    
     spark_session = session_builder.appName(
         app_name).getOrCreate()
     spark_app_id = spark_session.sparkContext.applicationId
@@ -274,14 +278,9 @@ def run_query_stream(input_prefix,
     if input_format != 'iceberg' and input_format != 'delta':
         execution_time_list = setup_tables(spark_session, input_prefix, input_format,
                                            execution_time_list)
-    elif input_format == 'delta':
-        if delta_unmanaged:
-            execution_time_list = register_delta_tables(spark_session, input_prefix,
-                                                        execution_time_list)
-        else:
-            session_builder.config("spark.sql.warehouse.dir", input_prefix)
-            # session_builder.enableHiveSupport()
-
+    elif input_format == 'delta' and delta_unmanaged:
+        execution_time_list = register_delta_tables(spark_session, input_prefix,
+                                                    execution_time_list)
 
     check_json_summary_folder(json_summary_folder)
     if sub_queries:
