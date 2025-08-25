@@ -230,6 +230,7 @@ def run_query_stream(input_prefix,
                      iterations,
                      plan_types,
                      input_format,
+                     delta_unmanaged=False,
                      output_path=None,
                      keep_sc=False,
                      output_format="parquet",
@@ -265,15 +266,22 @@ def run_query_stream(input_prefix,
         spark_properties = load_properties(property_file)
         for k, v in spark_properties.items():
             session_builder = session_builder.config(k, v)
+    
     spark_session = session_builder.appName(
         app_name).getOrCreate()
     spark_app_id = spark_session.sparkContext.applicationId
+
     if input_format != 'iceberg' and input_format != 'delta':
         execution_time_list = setup_tables(spark_session, input_prefix, input_format,
                                            execution_time_list)
     elif input_format == 'delta':
-        execution_time_list = register_delta_tables(spark_session, input_prefix,
-                                                     execution_time_list)
+        if delta_unmanaged:
+            execution_time_list = register_delta_tables(spark_session, input_prefix,
+                                                        execution_time_list)
+        else:
+            session_builder.config("spark.sql.warehouse.dir", input_prefix)
+            session_builder.enableHiveSupport()
+
 
     check_json_summary_folder(json_summary_folder)
     if sub_queries:
@@ -385,6 +393,10 @@ if __name__ == "__main__":
                              'for more details.',
                         choices=['parquet', 'orc', 'avro', 'csv', 'json', 'iceberg', 'delta'],
                         default='parquet')
+    parser.add_argument('--delta_unmanaged',
+                        action='store_true',
+                        help='Use unmanaged tables for DeltaLake. This is useful for testing DeltaLake without ' +
+        '               leveraging a Metastore service.')
     parser.add_argument('--output_prefix',
                         help='text to prepend to every output file (e.g., "hdfs:///ds-parquet")')
     parser.add_argument('--json_summary_folder',
@@ -432,6 +444,7 @@ if __name__ == "__main__":
                      args.iterations,
                      args.plan_types,
                      args.input_format,
+                     args.delta_unmanaged,
                      args.output_prefix,
                      args.keep_sc,
                      args.output_format,
