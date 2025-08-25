@@ -280,7 +280,7 @@ def run_query_stream(input_prefix,
                                                         execution_time_list)
         else:
             session_builder.config("spark.sql.warehouse.dir", input_prefix)
-            session_builder.enableHiveSupport()
+            # session_builder.enableHiveSupport()
 
 
     check_json_summary_folder(json_summary_folder)
