@@ -35,12 +35,10 @@ import os
 import time
 from collections import OrderedDict
 from pyspark.sql import SparkSession
-from pyspark.conf import SparkConf
 from PysparkBenchReport import PysparkBenchReport
 from pyspark.sql import DataFrame
 
 from check import check_version
-from nds_gen_query_stream import split_special_query
 from nds_transcode import get_schemas
 
 check_version()
@@ -63,10 +61,16 @@ def gen_sql_from_stream(query_stream_file_path):
     for q in all_queries:
         # e.g. "-- start query 32 in stream 0 using template query98.tpl"
         query_name = q[q.find('template')+9: q.find('.tpl')]
-        if 'select' in q.split(';')[1]:
-            part_1, part_2 = split_special_query(q)
-            extended_queries[query_name + '_part1'] = part_1
-            extended_queries[query_name + '_part2'] = part_2
+        splits = query_name.split(';')
+        query_parts = []
+        for s in splits:
+            s = s.strip()
+            if s and not s.startswith('--'):
+                query_parts.append(s)
+        if len(query_parts) > 1:
+            for i in range(len(query_parts)):
+                query_parts[i] = query_parts[i]
+                extended_queries[query_name + f"_part{i+1}"] = query_parts[i]
         else:
             extended_queries[query_name] = q
 
