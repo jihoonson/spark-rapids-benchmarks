@@ -305,7 +305,8 @@ def run_query_stream(input_prefix,
                                      skip_execution)
         print(f"Time taken: {summary['queryTimes']} millis for {query_name}")
         query_times = summary['queryTimes']
-        execution_time_list.append((spark_app_id, query_name, query_times[0]))
+        for query_time in query_times:
+            execution_time_list.append((spark_app_id, query_name, query_time))
         queries_reports.append(q_report)
         if json_summary_folder:
             if property_file:
