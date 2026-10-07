@@ -48,6 +48,7 @@ from setup_utils import add_utils_to_sys_path
 add_utils_to_sys_path()
 from spark_utils import setQueryName, clearQueryName
 from profiler import Profiler
+from unity_catalog import setup_unity_catalog
 
 check_version()
 
@@ -430,7 +431,10 @@ def run_query_stream(input_prefix,
                      skip_execution=False,
                      app_name=None,
                      spark_connect=None,
-                     analyze_tables=False):
+                     analyze_tables=False,
+                     unity_catalog=False,
+                     uc_catalog='ab',
+                     uc_schema=None):
     """run SQL in Spark and record execution time log. The execution time log is saved as a CSV file
     for easy accessibility. TempView Creation time is also recorded.
 
@@ -466,24 +470,28 @@ def run_query_stream(input_prefix,
         spark_properties = load_properties(property_file)
         for k,v in spark_properties.items():
             session_builder = session_builder.config(k,v)
-    if input_format == 'iceberg':
+    if not unity_catalog and input_format == 'iceberg':
         session_builder.config("spark.sql.catalog.spark_catalog.warehouse", input_prefix)
-    if input_format == 'delta' and not delta_unmanaged:
+    if not unity_catalog and input_format == 'delta' and not delta_unmanaged:
         session_builder.config("spark.sql.warehouse.dir", input_prefix)
         session_builder.enableHiveSupport()
-    if hive_external:
+    if not unity_catalog and hive_external:
         session_builder.enableHiveSupport()
 
     spark_session = session_builder.appName(
         app_name).getOrCreate()
-    if hive_external:
+    if unity_catalog:
+        execution_time_list = setup_unity_catalog(
+            spark_session, input_prefix, get_schemas(False), _get_app_id(spark_session),
+            uc_catalog, 'nds' if uc_schema is None else uc_schema)
+    elif hive_external:
         spark_session.catalog.setCurrentDatabase(input_prefix)
 
-    if input_format == 'delta' and delta_unmanaged:
+    if not unity_catalog and input_format == 'delta' and delta_unmanaged:
         # Register tables for Delta Lake. This is only needed for unmanaged tables.
         execution_time_list = register_delta_tables(spark_session, input_prefix, execution_time_list)
     spark_app_id = _get_app_id(spark_session)
-    if input_format != 'iceberg' and input_format != 'delta' and not hive_external:
+    if not unity_catalog and input_format != 'iceberg' and input_format != 'delta' and not hive_external:
         execution_time_list = setup_tables(spark_session, input_prefix, input_format, use_decimal,
                                            execution_time_list,
                                            analyze_tables)
@@ -618,6 +626,13 @@ def load_properties(filename):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('--unity_catalog', action='store_true',
+                        help='Register the input Delta dataset in OSS Unity Catalog. '
+                             'Configure the connection and packages in the Spark template.')
+    parser.add_argument('--uc_catalog', default='ab',
+                        help='Unity Catalog catalog name (default: ab)')
+    parser.add_argument('--uc_schema',
+                        help='Unity Catalog schema name (default: nds)')
     # argument group for query filtering
     query_filter_group = parser.add_mutually_exclusive_group(required=False)
     parser.add_argument('input_prefix',
@@ -626,7 +641,8 @@ if __name__ == "__main__":
                         '"spark.sql.catalog.spark_catalog.warehouse". Only default Spark catalog ' +
                         'session name "spark_catalog" is supported now, customized catalog is not ' +
                         'yet supported. Note if this points to a Delta Lake table, the path must be ' +
-                        'absolute. Issue: https://github.com/delta-io/delta/issues/555')
+                        'absolute. Issue: https://github.com/delta-io/delta/issues/555. ' +
+                        'With --unity_catalog, this is the Delta dataset root for source registration.')
     parser.add_argument('query_stream_file',
                         help='query stream file that contains NDS queries in specific order')
     parser.add_argument('time_log',
@@ -747,4 +763,7 @@ if __name__ == "__main__":
                      args.skip_execution,
                      args.app_name,
                      args.spark_connect,
-                     args.analyze_tables)
+                     args.analyze_tables,
+                     args.unity_catalog,
+                     args.uc_catalog,
+                     args.uc_schema)
